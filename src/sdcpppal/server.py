@@ -468,7 +468,10 @@ async def generate_image(
         control_image: ControlNet conditioning image.
         ref_images: Reference images (e.g. for Qwen-Image-Edit).
         control_strength: ControlNet strength (default 0.9 server-side).
-        lora: List of {path, multiplier, is_high_noise} dicts.
+        lora: List of {path, multiplier, is_high_noise} dicts. Paths are
+            forwarded to sd-server verbatim (not sandboxed to CWD like
+            image inputs) — sd-server's own filesystem access governs
+            what's loadable.
         output_dir: Where to write images. If None → XDG default
                     (~/.local/share/sdcpppal/outputs). Relative paths resolve
                     under the workspace (CWD), so other MCPs sharing the

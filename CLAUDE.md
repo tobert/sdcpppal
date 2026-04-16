@@ -86,11 +86,13 @@ Unlike Ollama, which can load multiple models on demand, sd-server loads **one**
 
 ### Path sandboxing
 
-`_validate_path` (copied from ollapal) restricts input file paths to the current working directory:
+`_validate_path` (copied from ollapal) restricts **input image** file paths to the current working directory:
 
 - resolves relative paths under CWD
 - rejects paths that escape CWD after resolution
 - rejects symlinks whose absolute target is outside CWD
+
+Applies to `init_image`, `mask_image`, `control_image`, and each element of `ref_images`. Does **not** apply to `lora[].path` — LoRA paths are forwarded to `sd-server` verbatim because the common case is a shared model store (e.g. `/tank/ml/models/loras/...`) living outside any workspace. Access to a given LoRA is governed by what the `sd-server` process can read on its own filesystem; sdcpppal is a passthrough on this field by design. If you want tighter control, configure `sd-server` itself (directory flags, filesystem perms, container mounts) rather than expecting sdcpppal to gate it.
 
 ### Optional sampler field semantics
 
