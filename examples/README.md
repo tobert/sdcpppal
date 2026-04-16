@@ -281,6 +281,61 @@ generate_image(
 )
 ```
 
+## LoRA demo: wiring vs. activation
+
+Three gens on a single prompt-and-seed axis showing how sdcpppal's `lora[]` field behaves. All three use `seed=42`, `steps=8`; gens 2 and 3 attach [`Haruka041/z-image-anime-lora`](https://huggingface.co/Haruka041/z-image-anime-lora) at multiplier `0.8`.
+
+| 1. Baseline (no LoRA) | 2. LoRA attached, bland prompt | 3. LoRA attached, style cues |
+|---|---|---|
+| ![](lora_01_baseline.png) | ![](lora_02_no_cue.png) | ![](lora_03_with_cue.png) |
+
+The interesting one is **gen 2**. It looks nearly identical to the baseline photo — but sd-server's logs show `(480 / 480) LoRA tensors have been applied, lora_file_path = .../sk_anime_style_v1.0.safetensors`. The weights *are* loaded. The sampler just has no reason to follow them: "a cat on a windowsill" is a prompt the base model handles fine, so the LoRA's pull gets averaged out toward the photorealistic answer.
+
+**Gen 3** adds `masterpiece, best quality, anime style, 2d illustration, cel shading` — style cues the LoRA was trained to respond to — and the cat flips to pastel cel-shaded anime.
+
+Takeaway: if a LoRA seems to do nothing, read its model card for a trigger phrase or style keywords before assuming the LoRA is broken. The fact that sdcpppal successfully forwarded the `lora[]` array doesn't guarantee a visible stylistic change — that requires prompt engineering too.
+
+### Reproduce
+
+```python
+# 1 — baseline, no LoRA
+generate_image(
+    prompt="a cat on a windowsill",
+    width=512, height=512, steps=8, seed=42,
+    output_dir="./examples",
+    filename_prefix="lora_01_baseline",
+)
+
+# 2 — LoRA attached, no style cue (proves wiring; activation fails)
+generate_image(
+    prompt="a cat on a windowsill",
+    width=512, height=512, steps=8, seed=42,
+    lora=[{
+        "path": "z-image-anime-lora/sk_anime_style_v1.0.safetensors",
+        "multiplier": 0.8,
+    }],
+    output_dir="./examples",
+    filename_prefix="lora_02_no_cue",
+)
+
+# 3 — LoRA attached, with style cues
+generate_image(
+    prompt=(
+        "masterpiece, best quality, anime style, a cat on a windowsill, "
+        "2d illustration, soft pastel colors, cel shading"
+    ),
+    width=512, height=512, steps=8, seed=42,
+    lora=[{
+        "path": "z-image-anime-lora/sk_anime_style_v1.0.safetensors",
+        "multiplier": 0.8,
+    }],
+    output_dir="./examples",
+    filename_prefix="lora_03_with_cue",
+)
+```
+
+The `lora[].path` is resolved relative to the `sd-server` process's `--lora-model-dir`. On this rig, sd-server is started with `--lora-model-dir /tank/ml/models/loras`, so `z-image-anime-lora/sk_anime_style_v1.0.safetensors` resolves there. sdcpppal does not gate the path — see the [LoRA access-model note in the main README](../README.md#features).
+
 ## Wordmark notes
 
 Z-Image Turbo, like most diffusion models, struggles with repeated letters in unusual runs — the triple-p in `sdcpppal` was consistently dropped to `pp` in single-line layouts. Two workarounds that held up:
