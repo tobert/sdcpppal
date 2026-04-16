@@ -31,3 +31,7 @@ Thumbs.db
 *.webp
 !tests/fixtures/*.png
 !assets/**/*.png
+!examples/**/*.png
+!examples/**/*.jpg
+!examples/**/*.jpeg
+!examples/**/*.webp
