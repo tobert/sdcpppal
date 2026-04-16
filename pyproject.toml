@@ -1,6 +1,6 @@
 [project]
 name = "sdcpppal"
-version = "0.1.0"
+version = "0.1.1"
 description = "An MCP server providing native stable-diffusion.cpp access via sd-server's /sdcpp/v1 API"
 readme = "README.md"
 license = "MIT"

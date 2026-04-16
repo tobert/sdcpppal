@@ -335,3 +335,44 @@ class TestPollJob:
         monkeypatch.setattr(S, "_get_json", fake_get)
         with pytest.raises(TimeoutError):
             await S._poll_job("j1", timeout=0.1, ctx=None, poll_interval=0.01)
+
+    async def test_no_progress_on_terminal_cycle(self, monkeypatch):
+        # Regression: a progress notification sent on the same cycle the job
+        # reaches a terminal state races the tool return. It can arrive at
+        # Claude Code's MCP client after the progressToken has been released,
+        # which the client treats as a fatal stdio transport error and drops
+        # the connection — killing the sdcpppal process. See MCP log entry:
+        #   "Received a progress notification for an unknown token:
+        #    {progress: 14.67, total: 600, progressToken: 18}"
+        # The terminal cycle must NOT call ctx.report_progress.
+        calls = {"n": 0}
+
+        async def fake_get(path):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                return {"id": "j1", "status": "generating"}
+            return {
+                "id": "j1",
+                "status": "completed",
+                "result": {"output_format": "png", "images": []},
+            }
+
+        class RecordingCtx:
+            def __init__(self):
+                self.progress_calls = 0
+
+            async def info(self, _msg):
+                pass
+
+            async def report_progress(self, _done, _total):
+                self.progress_calls += 1
+
+        ctx = RecordingCtx()
+        monkeypatch.setattr(S, "_get_json", fake_get)
+        result = await S._poll_job("j1", timeout=5.0, ctx=ctx, poll_interval=0.0)
+        assert result["status"] == "completed"
+        assert calls["n"] == 3
+        assert ctx.progress_calls == 2, (
+            f"report_progress called {ctx.progress_calls}x; expected 2 "
+            "(one per non-terminal poll). Terminal cycle must skip progress."
+        )

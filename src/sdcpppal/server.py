@@ -384,6 +384,14 @@ async def _poll_job(
                 pass
             last_status = status
 
+        # Return before any progress notification on the terminal cycle.
+        # A progress notification racing the tool return seems to arrive at
+        # the MCP client after the progressToken is released; strict clients
+        # (observed: Claude Code 2.1.111) seem to drop the stdio transport
+        # on unknown tokens, killing this process.
+        if status in terminal:
+            return job
+
         if ctx is not None:
             try:
                 elapsed = time.monotonic() - start
@@ -391,9 +399,6 @@ async def _poll_job(
                 await ctx.report_progress(min(elapsed, timeout), timeout)
             except Exception:
                 pass
-
-        if status in terminal:
-            return job
 
         if time.monotonic() >= deadline:
             raise TimeoutError(
