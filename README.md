@@ -1,0 +1,138 @@
+# sdcpppal — your pal stable-diffusion.cpp
+
+An MCP server that lets any MCP client generate images through a running [`sd-server`](https://github.com/leejet/stable-diffusion.cpp) — locally, using the server's native `/sdcpp/v1/*` async API.
+
+**Part of the pal family:** [gpal](https://github.com/tobert/gpal) (Gemini), [cpal](https://github.com/tobert/cpal) (Claude), [ollapal](https://github.com/tobert/ollapal) (Ollama), sdcpppal (stable-diffusion.cpp). Each wraps its vendor's native API — no compat-layer shims.
+
+## Features
+
+- 🎨 **txt2img / img2img / inpaint / ControlNet / ref-images** — same tool, differently populated fields
+- 🧩 **LoRA** — passed through structured `lora[]` array (prompt-embedded `<lora:...>` tags are not supported server-side)
+- 🔎 **Discovery** — `get_capabilities`, `list_samplers`, `list_schedulers`, `list_loras`, `get_current_model`
+- 📂 **Workspace-friendly output** — default writes to XDG dir, relative `output_dir` resolves under CWD so agents sharing a workspace can share generated files
+- 🛡️ **Input sandboxing** — file-path input images are restricted to the project directory (no `..` traversal, no absolute-target symlinks); base64 and `data:image/...;base64,...` accepted too
+- ⏱ **Progress reporting** — job status (queued → generating → completed) is reported through MCP context
+
+## Install
+
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) and a running `sd-server`.
+
+```bash
+git clone https://github.com/tobert/sdcpppal && cd sdcpppal
+uv tool install .
+```
+
+Start `sd-server` first (example):
+
+```bash
+sd-server -m /path/to/model.gguf --listen-port 1234
+```
+
+## Configure
+
+### Claude Code
+
+```bash
+claude mcp add sdcpppal --scope user -- sdcpppal
+```
+
+### Gemini CLI
+
+```bash
+gemini mcp add sdcpppal --scope user -- sdcpppal
+```
+
+### Manual
+
+```json
+{
+  "mcpServers": {
+    "sdcpppal": {
+      "command": "sdcpppal",
+      "env": { "SDCPP_HOST": "http://localhost:1234" }
+    }
+  }
+}
+```
+
+## Usage
+
+> **"Generate a picture of a cat on a windowsill"** → `generate_image(prompt="a cat on a windowsill")`
+>
+> **"Make that image square-format and use the karras scheduler"** → `generate_image(prompt="...", width=768, height=768, scheduler="karras")`
+>
+> **"Turn this photo anime"** → `generate_image(prompt="anime style", init_image="photo.jpg", strength=0.6)`
+
+### Tool reference
+
+```python
+# Simple txt2img — uses the server's defaults
+generate_image(prompt="a cat on a windowsill")
+
+# Custom resolution, sampler, seed
+generate_image(
+    prompt="...",
+    width=1024, height=1024,
+    steps=28, cfg=7.0,
+    sampler="euler_a", scheduler="karras",
+    seed=42,
+)
+
+# img2img / inpaint / control
+generate_image(prompt="...", init_image="photo.jpg", strength=0.6)
+generate_image(prompt="...", init_image="photo.jpg", mask_image="mask.png")
+generate_image(prompt="...", control_image="canny.png", control_strength=0.9)
+
+# LoRA (structured — not prompt-embedded <lora:...> tags)
+generate_image(prompt="...", lora=[{"path": "mystyle.safetensors", "multiplier": 0.8}])
+
+# Write into the workspace so other MCPs can see the output
+generate_image(prompt="...", output_dir="./generated")
+
+# Discovery
+get_capabilities()
+list_samplers()
+list_schedulers()
+list_loras()
+get_current_model()
+```
+
+## Output
+
+`generate_image` returns:
+
+```json
+{
+  "paths": ["/home/you/.local/share/sdcpppal/outputs/a_cat_1775401215_00.png"],
+  "count": 1,
+  "job_id": "job_01HTXYZABC",
+  "status": "completed",
+  "output_dir": "/home/you/.local/share/sdcpppal/outputs",
+  "output_format": "png",
+  "prompt": "a cat on a windowsill",
+  "seed": -1,
+  "duration_seconds": 4.2
+}
+```
+
+By default, images go to `$XDG_DATA_HOME/sdcpppal/outputs` (i.e. `~/.local/share/sdcpppal/outputs`). To share output with other workspace-scoped MCPs, pass a **relative** `output_dir` — it will resolve under the current working directory.
+
+## Environment
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SDCPP_HOST` | `http://localhost:1234` | Where `sd-server` is listening |
+| `XDG_DATA_HOME` | `~/.local/share` | Determines default output dir |
+
+## Configuration file
+
+`~/.config/sdcpppal/config.toml`:
+
+```toml
+sdcpp_host = "http://localhost:1234"
+output_dir = "~/Pictures/sdcpppal"
+```
+
+## License
+
+MIT

@@ -1,0 +1,38 @@
+[project]
+name = "sdcpppal"
+version = "0.1.0"
+description = "An MCP server providing native stable-diffusion.cpp access via sd-server's /sdcpp/v1 API"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "A Tobey", email = "tobert@gmail.com" }]
+requires-python = ">=3.12"
+keywords = ["mcp", "stable-diffusion", "sd-cpp", "image-generation", "ai", "local"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "httpx>=0.27",
+    "fastmcp>=3.0.1",
+    "mcp[cli]>=1.26.0",
+    "python-dotenv>=1.2.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0.2", "pytest-asyncio>=0.23", "respx>=0.21"]
+
+[project.scripts]
+sdcpppal = "sdcpppal.server:main"
+
+[project.urls]
+Homepage = "https://github.com/tobert/sdcpppal"
+Repository = "https://github.com/tobert/sdcpppal"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
